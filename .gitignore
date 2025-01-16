@@ -1,0 +1,16 @@
+# Build directories
+build/
+release/
+
+# Binary files
+gitid
+gitid-static
+
+# IDE files
+.idea/
+.vscode/
+
+# OS specific files
+.DS_Store
+*.swp
+*.swo

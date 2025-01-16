@@ -1,0 +1,51 @@
+name: gitid
+arch: ${ARCH:=amd64}
+platform: linux
+version: ${VERSION:=0.1.0}
+version_schema: semver
+section: utils
+priority: optional
+maintainer: Nathanael Bonfim <dev@nathabonfim59.com>
+description: |
+  Git Identity Manager - A tool to manage multiple git identities
+
+  A terminal-based application that helps developers manage multiple git identities
+  easily through an interactive interface.
+vendor: nathabonfim59
+homepage: https://github.com/nathabonfim59/gitid
+license: MIT
+
+# Files to include in the package
+contents:
+  # Binary
+  - src: build/gitid_linux_${ARCH}
+    dst: /usr/local/bin/gitid
+    file_info:
+      mode: 0755
+
+  # Documentation directory
+  - src: README.md
+    dst: /usr/share/doc/gitid/README.md
+    file_info:
+      mode: 0644
+
+# Dependencies for all formats
+depends:
+  - git
+
+# Package specific configurations
+deb:
+  compression: gz
+
+rpm:
+  compression: gz
+  group: Development/Tools
+
+overrides:
+  # Version constraints for different package formats
+  deb:
+    depends:
+      - git (>= 2.0.0)
+  rpm:
+    depends:
+      - git >= 2.0.0

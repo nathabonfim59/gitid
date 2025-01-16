@@ -12,17 +12,31 @@ import (
     "github.com/charmbracelet/lipgloss"
 )
 
+// UI color scheme
+var (
+    highlightColor = lipgloss.Color("6")  // Cyan
+    subtleColor    = lipgloss.Color("8")  // Gray
+    errorColor     = lipgloss.Color("1")  // Red
+    successColor   = lipgloss.Color("2")  // Green
+)
+
 type model struct {
     identities []string
     cursor     int
+    showConfirmation bool
+    confirmChoices   []string
+    confirmCursor    int
 }
 
 func initialModel() model {
     identities := listIdentities()
     identities = append(identities, "Add new identity")
     return model{
-        identities: identities,
-        cursor:     0,
+        identities:       identities,
+        cursor:          0,
+        showConfirmation: false,
+        confirmChoices:   []string{"Yes", "No"},
+        confirmCursor:    1, // Default to "No"
     }
 }
 
@@ -36,23 +50,57 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         switch msg.String() {
         case "ctrl+c", "q":
             return m, tea.Quit
-            case "up", "k":
-                if m.cursor > 0 {
-                    m.cursor--
-                }
-            case "down", "j":
-                if m.cursor < len(m.identities)-1 {
-                    m.cursor++
-                }
+        case "up", "k":
+            if m.cursor > 0 {
+                m.cursor--
+            }
+        case "down", "j":
+            if m.cursor < len(m.identities)-1 {
+                m.cursor++
+            }
         case "enter":
-            if m.identities[m.cursor] == "Add new identity" {
-                addIdentity()
-                m.identities = listIdentities()
-                m.identities = append(m.identities, "Add new identity")
+            if m.showConfirmation {
+                if m.confirmCursor == 0 { // Yes selected
+                    _, email := parseIdentity(m.identities[m.cursor])
+                    if err := deleteIdentity(email); err != nil {
+                        fmt.Printf("Error deleting identity: %v\n", err)
+                    } else {
+                        m.identities = listIdentities()
+                        m.identities = append(m.identities, "Add new identity")
+                        if m.cursor >= len(m.identities) {
+                            m.cursor = len(m.identities) - 1
+                        }
+                    }
+                }
+                m.showConfirmation = false
+                m.confirmCursor = 1 // Reset to "No"
             } else {
-                name, email := parseIdentity(m.identities[m.cursor])
-                switchIdentity(name, email)
-                return m, tea.Quit
+                if m.identities[m.cursor] == "Add new identity" {
+                    addIdentity()
+                    m.identities = listIdentities()
+                    m.identities = append(m.identities, "Add new identity")
+                } else {
+                    name, email := parseIdentity(m.identities[m.cursor])
+                    switchIdentity(name, email)
+                    return m, tea.Quit
+                }
+            }
+        case "D":
+            if m.identities[m.cursor] != "Add new identity" {
+                m.showConfirmation = true
+            }
+        case "left", "h":
+            if m.showConfirmation && m.confirmCursor > 0 {
+                m.confirmCursor--
+            }
+        case "right", "l":
+            if m.showConfirmation && m.confirmCursor < len(m.confirmChoices)-1 {
+                m.confirmCursor++
+            }
+        case "esc":
+            if m.showConfirmation {
+                m.showConfirmation = false
+                m.confirmCursor = 1 // Reset to "No"
             }
         }
     }
@@ -61,20 +109,66 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
     style := lipgloss.NewStyle().Margin(0, 1)
-    title := lipgloss.NewStyle().Bold(true).Render("Git Identity Manager")
-    
+    title := lipgloss.NewStyle().
+        Bold(true).
+        Foreground(highlightColor).
+        Render("Git Identity Manager")
+
     var items []string
     for i, identity := range m.identities {
-        cursor := " "
+        cursor := "  "
         if m.cursor == i {
-            cursor = ">"
-            identity = lipgloss.NewStyle().Bold(true).Render(identity)
+            cursor = "▸ "
+            if identity == "Add new identity" {
+                identity = lipgloss.NewStyle().
+                    Foreground(successColor).
+                    Bold(true).
+                    Render(identity)
+            } else {
+                identity = lipgloss.NewStyle().
+                    Foreground(highlightColor).
+                    Bold(true).
+                    Render(identity)
+            }
         }
-        items = append(items, fmt.Sprintf("%s %s", cursor, identity))
+        items = append(items, fmt.Sprintf("%s%s", cursor, identity))
     }
-    
-    help := "\n↑/k up • ↓/j down • q quit"
-    
+
+    // Confirmation dialog
+    if m.showConfirmation {
+        confirmMsg := lipgloss.NewStyle().
+            Foreground(errorColor).
+            Bold(true).
+            Render("\nAre you sure you want to delete this identity?")
+
+        var choices []string
+        for i, choice := range m.confirmChoices {
+            if i == m.confirmCursor {
+                choice = lipgloss.NewStyle().
+                    Background(highlightColor).
+                    Foreground(lipgloss.Color("0")).
+                    Bold(true).
+                    Render(" " + choice + " ")
+            } else {
+                choice = lipgloss.NewStyle().
+                    Foreground(subtleColor).
+                    Render(" " + choice + " ")
+            }
+            choices = append(choices, choice)
+        }
+
+        items = append(items,
+            confirmMsg,
+            "\n"+strings.Join(choices, " "),
+        )
+    }
+
+    helpStyle := lipgloss.NewStyle().Foreground(subtleColor)
+    help := helpStyle.Render("\n" +
+        "↑/k up • ↓/j down • enter select • D delete • q quit\n" +
+        "Confirmation: ←/→ navigate • enter confirm • esc cancel",
+    )
+
     return style.Render(
         title + "\n\n" +
         strings.Join(items, "\n") +
@@ -131,6 +225,20 @@ func listIdentities() []string {
     return identities
 }
 
+func deleteIdentity(email string) error {
+    section := strings.ReplaceAll(strings.ReplaceAll(email, "@", "_at_"), ".", "_dot_")
+
+    nameCmd := fmt.Sprintf("identity.%s.name", section)
+    emailCmd := fmt.Sprintf("identity.%s.email", section)
+
+    if err := exec.Command("git", "config", "--global", "--unset", nameCmd).Run(); err != nil {
+        return fmt.Errorf("error removing name: %w", err)
+    }
+    if err := exec.Command("git", "config", "--global", "--unset", emailCmd).Run(); err != nil {
+        return fmt.Errorf("error removing email: %w", err)
+    }
+    return nil
+}
 func parseIdentity(identity string) (string, string) {
     parts := strings.Split(identity, "(")
     name := strings.TrimSpace(parts[0])
@@ -153,12 +261,17 @@ func prompt(placeholder string) string {
         os.Exit(1)
     }
 
-    return m.(inputModel).value
+    result := m.(inputModel)
+    if result.interrupted {
+        os.Exit(0)
+    }
+    return result.value
 }
 
 type inputModel struct {
-    textInput textinput.Model
-    value     string
+    textInput  textinput.Model
+    value      string
+    interrupted bool
 }
 
 func (m inputModel) Init() tea.Cmd {
@@ -174,8 +287,9 @@ func (m inputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         case tea.KeyEnter:
             m.value = m.textInput.Value()
             return m, tea.Quit
-        case tea.KeyCtrlC:
-            return m, tea.Quit
+            case tea.KeyCtrlC:
+                m.interrupted = true
+                return m, tea.Quit
         }
 
     }
