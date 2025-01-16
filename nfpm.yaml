@@ -18,7 +18,7 @@ license: MIT
 # Files to include in the package
 contents:
   # Binary
-  - src: build/gitid_linux_${ARCH}
+  - src: build/gitid_linux_amd64_musl
     dst: /usr/local/bin/gitid
     file_info:
       mode: 0755
@@ -35,10 +35,10 @@ depends:
 
 # Package specific configurations
 deb:
-  compression: gz
+  compression: zstd
 
 rpm:
-  compression: gz
+  compression: zstd
   group: Development/Tools
 
 overrides:

@@ -51,6 +51,13 @@ release: clean
 			-o $(BUILD_DIR)/$(BINARY_NAME)_$(GOOS)_$(GOARCH)$(EXTENSION); \
 		) \
 	)
+
+	# Build musl version for linux_amd64
+	CC=musl-gcc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+	$(GOBUILD) -tags musl \
+	-ldflags "-linkmode external -extldflags '-static' -X main.version=${VERSION} -s -w" \
+	-o $(BUILD_DIR)/$(BINARY_NAME)_linux_amd64_musl
+
 	# Create Linux packages for each architecture
 	$(foreach ARCH, $(ARCHITECTURES), \
 		ARCH=$(ARCH) VERSION=$(VERSION) nfpm package \
