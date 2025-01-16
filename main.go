@@ -7,7 +7,9 @@ import (
     "regexp"
     "strings"
 
+    "github.com/charmbracelet/bubbles/textinput"
     tea "github.com/charmbracelet/bubbletea"
+    "github.com/charmbracelet/lipgloss"
 )
 
 type model struct {
@@ -34,14 +36,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         switch msg.String() {
         case "ctrl+c", "q":
             return m, tea.Quit
-        case "up":
-            if m.cursor > 0 {
-                m.cursor--
-            }
-        case "down":
-            if m.cursor < len(m.identities)-1 {
-                m.cursor++
-            }
+            case "up", "k":
+                if m.cursor > 0 {
+                    m.cursor--
+                }
+            case "down", "j":
+                if m.cursor < len(m.identities)-1 {
+                    m.cursor++
+                }
         case "enter":
             if m.identities[m.cursor] == "Add new identity" {
                 addIdentity()
@@ -58,16 +60,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-    s := "Git Identity Manager\n\n"
+    style := lipgloss.NewStyle().Margin(0, 1)
+    title := lipgloss.NewStyle().Bold(true).Render("Git Identity Manager")
+    
+    var items []string
     for i, identity := range m.identities {
         cursor := " "
         if m.cursor == i {
             cursor = ">"
+            identity = lipgloss.NewStyle().Bold(true).Render(identity)
         }
-        s += fmt.Sprintf("%s %s\n", cursor, identity)
+        items = append(items, fmt.Sprintf("%s %s", cursor, identity))
     }
-    s += "\nPress q to quit\n"
-    return s
+    
+    help := "\n↑/k up • ↓/j down • q quit"
+    
+    return style.Render(
+        title + "\n\n" +
+        strings.Join(items, "\n") +
+        help,
+    )
 }
 
 func addIdentity() {
@@ -127,10 +139,55 @@ func parseIdentity(identity string) (string, string) {
 }
 
 func prompt(placeholder string) string {
-    fmt.Print(placeholder + ": ")
-    var input string
-    fmt.Scanln(&input)
-    return input
+    input := textinput.New()
+    input.Placeholder = placeholder
+    input.Focus()
+
+    p := tea.NewProgram(inputModel{
+        textInput: input,
+    })
+
+    m, err := p.Run()
+    if err != nil {
+        fmt.Printf("Error running prompt: %v\n", err)
+        os.Exit(1)
+    }
+
+    return m.(inputModel).value
+}
+
+type inputModel struct {
+    textInput textinput.Model
+    value     string
+}
+
+func (m inputModel) Init() tea.Cmd {
+    return textinput.Blink
+}
+
+func (m inputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    var cmd tea.Cmd
+
+    switch msg := msg.(type) {
+    case tea.KeyMsg:
+        switch msg.Type {
+        case tea.KeyEnter:
+            m.value = m.textInput.Value()
+            return m, tea.Quit
+        case tea.KeyCtrlC:
+            return m, tea.Quit
+        }
+
+    }
+
+    m.textInput, cmd = m.textInput.Update(msg)
+    return m, cmd
+}
+
+func (m inputModel) View() string {
+    return lipgloss.NewStyle().
+        Margin(0, 1).
+        Render(m.textInput.View())
 }
 
 func main() {
