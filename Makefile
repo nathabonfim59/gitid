@@ -10,6 +10,8 @@ GOTEST=$(GOCMD) test
 
 # Build flags
 LDFLAGS=-ldflags "-X main.version=${VERSION} -s -w"
+# Strip 'v' prefix from version for package naming
+VERSION_CLEAN=$(shell echo $(VERSION) | sed 's/^v//')
 CGO_ENABLED=0
 
 # Supported platforms
@@ -59,15 +61,15 @@ release: clean
 	-o $(BUILD_DIR)/$(BINARY_NAME)_linux_amd64_musl
 
 	# Create Linux packages for each architecture
+	# Package for amd64 using musl binary
 	$(foreach ARCH, $(ARCHITECTURES), \
-		ARCH=$(ARCH) VERSION=$(VERSION) nfpm package \
-			-f nfpm.yaml \
-			-p deb \
-			-t $(RELEASE_DIR) && \
-		ARCH=$(ARCH) VERSION=$(VERSION) nfpm package \
-			-f nfpm.yaml \
-			-p rpm \
-			-t $(RELEASE_DIR); \
+	export ARCH=$(ARCH) && export VERSION=$(shell echo $(VERSION) | sed 's/^v//') && nfpm package \
+	-f nfpm.yaml \
+	-p deb \
+	-t $(RELEASE_DIR) && \
+	export ARCH=$(ARCH) && export VERSION=$(shell echo $(VERSION) | sed 's/^v//') && nfpm package \
+	-f nfpm.yaml \
+	-p rpm \
+	-t $(RELEASE_DIR); \
 	)
-
 .DEFAULT_GOAL := all

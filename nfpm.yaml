@@ -1,7 +1,7 @@
 name: gitid
 arch: ${ARCH:=amd64}
 platform: linux
-version: ${VERSION:=0.1.0}
+version: ${VERSION}
 version_schema: semver
 section: utils
 priority: optional
