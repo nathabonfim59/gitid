@@ -2,7 +2,7 @@
 
 A terminal-based tool that helps developers manage multiple Git identities easily through an interactive interface.
 
-![Demo](tape.gif)
+![demo](https://github.com/user-attachments/assets/8ec86e59-2cb1-47b7-9acd-54a7d0d8f20f)
 
 ## Features
 
@@ -13,6 +13,7 @@ A terminal-based tool that helps developers manage multiple Git identities easil
 - 🔒 Uses Git's built-in configuration system
 
 ## Installation
+
 
 ### From Binary
 
