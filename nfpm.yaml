@@ -6,8 +6,7 @@ version_schema: semver
 section: utils
 priority: optional
 maintainer: Nathanael Bonfim <dev@nathabonfim59.com>
-description: |
-  Git Identity Manager - A tool to manage multiple git identities
+description: Git Identity Manager - A tool to manage multiple git identities
 
   A terminal-based application that helps developers manage multiple git identities
   easily through an interactive interface.
