@@ -1,16 +1,44 @@
-# Git Identity Manager
+# Git Identity Manager (gitid)
 
-A terminal-based tool to manage multiple Git identities.
+A terminal-based tool that helps developers manage multiple Git identities easily through an interactive interface.
 
-## Building
+![Demo](tape.gif)
 
-### Prerequisites
+## Features
+
+- 🔄 Switch between multiple Git identities with ease
+- ➕ Add new identities interactively
+- 🗑️ Delete unwanted identities
+- 💻 Terminal-based UI with keyboard navigation
+- 🔒 Uses Git's built-in configuration system
+
+## Installation
+
+### From Binary
+
+Download the appropriate binary for your platform from the [releases page](https://github.com/nathabonfim59/gitid/releases).
+
+### From Package (Linux)
+
+#### Debian/Ubuntu:
+```bash
+sudo dpkg -i gitid_*.deb
+```
+
+#### RedHat/Fedora:
+```bash
+sudo rpm -i gitid_*.rpm
+```
+
+### Building from Source
+
+#### Prerequisites
 
 - Go 1.21 or later
 - Make
 - NFPM (for package generation)
 
-### Build Commands
+#### Build Commands
 
 ```bash
 # Build for your current platform
@@ -26,29 +54,29 @@ make release
 make clean
 ```
 
-## Installation
-
-### From Binary
-
-Download the appropriate binary for your platform from the releases page.
-
-### From Package (Linux)
-
-#### Debian/Ubuntu:
-```bash
-sudo dpkg -i release/gitid_*.deb
-```
-
-#### RedHat/Fedora:
-```bash
-sudo rpm -i release/gitid_*.rpm
-```
-
 ## Usage
 
-Run `gitid` to start the interactive prompt.
+Run `gitid` to start the interactive interface.
 
-- Use arrow keys or j/k to navigate
-- Press Enter to select an identity
-- Press D to delete an identity
-- Press q to quit
+### Keyboard Controls
+
+- `↑`/`↓` or `j`/`k` - Navigate through identities
+- `Enter` - Select identity or confirm action
+- `D` - Delete selected identity
+- `←`/`→` - Navigate confirmation dialog
+- `Esc` - Cancel current action
+- `q` - Quit application
+
+### Managing Identities
+
+- **Switch Identity**: Select an identity from the list and press Enter
+- **Add Identity**: Select "Add new identity" and follow the prompts
+- **Delete Identity**: Navigate to an identity and press D, then confirm
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
