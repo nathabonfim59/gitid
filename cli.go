@@ -4,7 +4,46 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/posener/complete/v2"
+	"github.com/posener/complete/v2/predict"
 )
+
+func predictIdentities(prefix string) []string {
+	identities := getAllIdentities()
+	var suggestions []string
+
+	for _, identity := range identities {
+		if identity.Nickname != "" {
+			suggestions = append(suggestions, identity.Nickname)
+		}
+		suggestions = append(suggestions, identity.Name)
+		suggestions = append(suggestions, identity.Email)
+	}
+
+	return suggestions
+}
+
+func setupCompletion() {
+	cmd := &complete.Command{
+		Sub: map[string]*complete.Command{
+			"list":     {},
+			"current":  {},
+			"switch":   {Args: complete.PredictFunc(predictIdentities)},
+			"use":      {Args: complete.PredictFunc(predictIdentities)},
+			"add":      {},
+			"delete":   {Args: complete.PredictFunc(predictIdentities)},
+			"nickname": {Args: complete.PredictFunc(predictIdentities)},
+			"help":     {},
+		},
+		Flags: map[string]complete.Predictor{
+			"h":    predict.Nothing,
+			"help": predict.Nothing,
+		},
+	}
+
+	cmd.Complete("gitid")
+}
 
 func handleCLICommand(args []string) error {
 	if len(args) == 0 {

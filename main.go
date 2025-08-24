@@ -6,6 +6,8 @@ import (
 )
 
 func main() {
+	setupCompletion()
+
 	if len(os.Args) == 1 {
 		runTUI()
 		return
