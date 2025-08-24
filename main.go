@@ -27,8 +27,112 @@ type Identity struct {
 	Nickname string // Optional, falls back to name if empty
 }
 
+// encodeEmail converts email to git config section format
+func encodeEmail(email string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(email, "@", "_at_"), ".", "_dot_")
+}
+
+// setNickname sets a nickname for an identity
+func setNickname(email, nickname string) error {
+	section := encodeEmail(email)
+	nicknameCmd := fmt.Sprintf("identity.%s.nickname", section)
+	return exec.Command("git", "config", "--global", nicknameCmd, nickname).Run()
+}
+
+// getNickname gets the nickname for an identity
+func getNickname(email string) string {
+	section := encodeEmail(email)
+	nicknameCmd := fmt.Sprintf("identity.%s.nickname", section)
+	out, err := exec.Command("git", "config", "--global", nicknameCmd).Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// hasNickname checks if an identity has a nickname set
+func hasNickname(email string) bool {
+	return getNickname(email) != ""
+}
+
+// getIdentityDisplay formats an identity for display
+func getIdentityDisplay(identity Identity) string {
+	if identity.Nickname != "" {
+		return fmt.Sprintf("%s (%s <%s>)", identity.Nickname, identity.Name, identity.Email)
+	}
+	return fmt.Sprintf("%s <%s>", identity.Name, identity.Email)
+}
+
+// getAllIdentities returns all identities as Identity structs
+func getAllIdentities() []Identity {
+	out, _ := exec.Command("git", "config", "--global", "--get-regexp", "^identity\\.").Output()
+	var identities []Identity
+	re := regexp.MustCompile(`identity\.(.+)\.name\s(.+)`)
+
+	for _, line := range strings.Split(string(out), "\n") {
+		matches := re.FindStringSubmatch(line)
+		if len(matches) > 2 {
+			section := matches[1]
+			name := matches[2]
+			emailCmd := fmt.Sprintf("identity.%s.email", section)
+			emailOut, _ := exec.Command("git", "config", "--global", emailCmd).Output()
+			email := strings.TrimSpace(string(emailOut))
+
+			identity := Identity{
+				Name:     name,
+				Email:    email,
+				Nickname: getNickname(email),
+			}
+			identities = append(identities, identity)
+		}
+	}
+	return identities
+}
+
+// findIdentityByIdentifier finds an identity by nickname, name, or email with smart matching
+func findIdentityByIdentifier(identifier string) (Identity, bool) {
+	identities := getAllIdentities()
+
+	// 1. Exact nickname match
+	for _, identity := range identities {
+		if identity.Nickname == identifier {
+			return identity, true
+		}
+	}
+
+	// 2. Exact email match
+	for _, identity := range identities {
+		if identity.Email == identifier {
+			return identity, true
+		}
+	}
+
+	// 3. Exact name match
+	for _, identity := range identities {
+		if identity.Name == identifier {
+			return identity, true
+		}
+	}
+
+	// 4. Partial email match (contains)
+	for _, identity := range identities {
+		if strings.Contains(identity.Email, identifier) {
+			return identity, true
+		}
+	}
+
+	// 5. Partial name match (contains)
+	for _, identity := range identities {
+		if strings.Contains(identity.Name, identifier) {
+			return identity, true
+		}
+	}
+
+	return Identity{}, false
+}
+
 type model struct {
-	identities       []string
+	identities       []Identity
 	cursor           int
 	showConfirmation bool
 	confirmChoices   []string
@@ -36,8 +140,7 @@ type model struct {
 }
 
 func initialModel() model {
-	identities := listIdentities()
-	identities = append(identities, "Add new identity")
+	identities := getAllIdentities()
 	return model{
 		identities:       identities,
 		cursor:           0,
@@ -62,38 +165,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor--
 			}
 		case "down", "j":
-			if m.cursor < len(m.identities)-1 {
+			if m.cursor < len(m.identities) {
 				m.cursor++
 			}
 		case "enter":
 			if m.showConfirmation {
 				if m.confirmCursor == 0 { // Yes selected
-					_, email := parseIdentity(m.identities[m.cursor])
+					email := m.identities[m.cursor].Email
 					if err := deleteIdentity(email); err != nil {
 						fmt.Printf("Error deleting identity: %v\n", err)
 					} else {
-						m.identities = listIdentities()
-						m.identities = append(m.identities, "Add new identity")
+						m.identities = getAllIdentities()
 						if m.cursor >= len(m.identities) {
-							m.cursor = len(m.identities) - 1
+							m.cursor = len(m.identities)
 						}
 					}
 				}
 				m.showConfirmation = false
 				m.confirmCursor = 1 // Reset to "No"
 			} else {
-				if m.identities[m.cursor] == "Add new identity" {
-					addIdentity()
-					m.identities = listIdentities()
-					m.identities = append(m.identities, "Add new identity")
+				if m.cursor >= len(m.identities) { // Add new identity
+					addIdentityTUI()
+					m.identities = getAllIdentities()
 				} else {
-					name, email := parseIdentity(m.identities[m.cursor])
-					switchIdentity(name, email)
+					identity := m.identities[m.cursor]
+					switchIdentity(identity.Name, identity.Email)
 					return m, tea.Quit
 				}
 			}
 		case "D":
-			if m.identities[m.cursor] != "Add new identity" {
+			if m.cursor < len(m.identities) { // Not on "Add new identity"
 				m.showConfirmation = true
 			}
 		case "left", "h":
@@ -124,22 +225,28 @@ func (m model) View() string {
 	var items []string
 	for i, identity := range m.identities {
 		cursor := "  "
+		displayText := getIdentityDisplay(identity)
 		if m.cursor == i {
 			cursor = "▸ "
-			if identity == "Add new identity" {
-				identity = lipgloss.NewStyle().
-					Foreground(successColor).
-					Bold(true).
-					Render(identity)
-			} else {
-				identity = lipgloss.NewStyle().
-					Foreground(highlightColor).
-					Bold(true).
-					Render(identity)
-			}
+			displayText = lipgloss.NewStyle().
+				Foreground(highlightColor).
+				Bold(true).
+				Render(displayText)
 		}
-		items = append(items, fmt.Sprintf("%s%s", cursor, identity))
+		items = append(items, fmt.Sprintf("%s%s", cursor, displayText))
 	}
+
+	// Add "Add new identity" option
+	cursor := "  "
+	displayText := "Add new identity"
+	if m.cursor >= len(m.identities) {
+		cursor = "▸ "
+		displayText = lipgloss.NewStyle().
+			Foreground(successColor).
+			Bold(true).
+			Render(displayText)
+	}
+	items = append(items, fmt.Sprintf("%s%s", cursor, displayText))
 
 	// Confirmation dialog
 	if m.showConfirmation {
@@ -183,21 +290,36 @@ func (m model) View() string {
 	)
 }
 
-func addIdentity() {
-	name := prompt("Enter name")
-	email := prompt("Enter email")
-	section := strings.ReplaceAll(strings.ReplaceAll(email, "@", "_at_"), ".", "_dot_")
+func addIdentity(name, email, nickname string) error {
+	section := encodeEmail(email)
 
 	nameCmd := fmt.Sprintf("identity.%s.name", section)
 	emailCmd := fmt.Sprintf("identity.%s.email", section)
 
 	if err := exec.Command("git", "config", "--global", nameCmd, name).Run(); err != nil {
-		fmt.Printf("Error setting name: %v\n", err)
-		return
+		return fmt.Errorf("error setting name: %w", err)
 	}
 	if err := exec.Command("git", "config", "--global", emailCmd, email).Run(); err != nil {
-		fmt.Printf("Error setting email: %v\n", err)
-		return
+		return fmt.Errorf("error setting email: %w", err)
+	}
+
+	// Set nickname if provided
+	if nickname != "" {
+		if err := setNickname(email, nickname); err != nil {
+			return fmt.Errorf("error setting nickname: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func addIdentityTUI() {
+	name := prompt("Enter name")
+	email := prompt("Enter email")
+	nickname := prompt("Enter nickname (optional)")
+
+	if err := addIdentity(name, email, nickname); err != nil {
+		fmt.Printf("Error adding identity: %v\n", err)
 	}
 }
 
@@ -212,31 +334,23 @@ func switchIdentity(name, email string) {
 	}
 }
 
-func listIdentities() []string {
-	out, _ := exec.Command("git", "config", "--global", "--get-regexp",
-		"^identity\\.").Output()
-	var identities []string
-	re := regexp.MustCompile(`identity\.(.+)\.name\s(.+)`)
-
-	for _, line := range strings.Split(string(out), "\n") {
-		matches := re.FindStringSubmatch(line)
-		if len(matches) > 2 {
-			section := matches[1]
-			name := matches[2]
-			emailCmd := fmt.Sprintf("identity.%s.email", section)
-			email, _ := exec.Command("git", "config", "--global", emailCmd).Output()
-			identity := fmt.Sprintf("%s (%s)", name, strings.TrimSpace(string(email)))
-			identities = append(identities, identity)
-		}
+// switchIdentityByIdentifier switches to an identity using smart matching
+func switchIdentityByIdentifier(identifier string) error {
+	identity, found := findIdentityByIdentifier(identifier)
+	if !found {
+		return fmt.Errorf("identity not found: %s", identifier)
 	}
-	return identities
+
+	switchIdentity(identity.Name, identity.Email)
+	return nil
 }
 
 func deleteIdentity(email string) error {
-	section := strings.ReplaceAll(strings.ReplaceAll(email, "@", "_at_"), ".", "_dot_")
+	section := encodeEmail(email)
 
 	nameCmd := fmt.Sprintf("identity.%s.name", section)
 	emailCmd := fmt.Sprintf("identity.%s.email", section)
+	nicknameCmd := fmt.Sprintf("identity.%s.nickname", section)
 
 	if err := exec.Command("git", "config", "--global", "--unset", nameCmd).Run(); err != nil {
 		return fmt.Errorf("error removing name: %w", err)
@@ -244,13 +358,10 @@ func deleteIdentity(email string) error {
 	if err := exec.Command("git", "config", "--global", "--unset", emailCmd).Run(); err != nil {
 		return fmt.Errorf("error removing email: %w", err)
 	}
+	// Remove nickname if it exists (ignore error if it doesn't exist)
+	exec.Command("git", "config", "--global", "--unset", nicknameCmd).Run()
+
 	return nil
-}
-func parseIdentity(identity string) (string, string) {
-	parts := strings.Split(identity, "(")
-	name := strings.TrimSpace(parts[0])
-	email := strings.TrimSuffix(parts[1], ")")
-	return name, email
 }
 
 func prompt(placeholder string) string {
