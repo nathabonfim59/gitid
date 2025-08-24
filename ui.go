@@ -79,6 +79,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.identities) {
 				editNicknameTUI(m.identities[m.cursor])
 				m.identities = getAllIdentities()
+				return m, tea.ClearScreen
 			}
 		case "left", "h":
 			if m.showConfirmation && m.confirmCursor > 0 {
