@@ -21,3 +21,11 @@ type InputModel struct {
 	value       string
 	interrupted bool
 }
+
+type CompletionPromptModel struct {
+	shell         string
+	choices       []string
+	cursor        int
+	shouldInstall bool
+	finished      bool
+}

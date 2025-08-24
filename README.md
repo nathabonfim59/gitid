@@ -80,6 +80,30 @@ Run `gitid` to start the interactive interface.
 - **Edit Nickname**: Select "Edit nickname" for existing identities
 - **Delete Identity**: Navigate to an identity and press D, then confirm
 
+### Shell Completions
+
+GitID supports shell completions for Bash, Zsh, and Fish to provide tab-completion for commands and arguments.
+
+#### Installation
+
+```bash
+# Install for your current shell (auto-detected)
+gitid completion bash    # For Bash
+gitid completion zsh     # For Zsh  
+gitid completion fish    # For Fish
+```
+
+#### Removal
+
+```bash
+# Remove completions
+gitid completion bash -r    # Remove Bash completions
+gitid completion zsh -r     # Remove Zsh completions
+gitid completion fish -r    # Remove Fish completions
+```
+
+After installation, restart your shell or source your configuration file (e.g., `source ~/.bashrc` or `source ~/.zshrc`).
+
 ### Nicknames
 
 Nicknames are optional short identifiers that make it easier to distinguish between identities:
