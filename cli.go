@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/posener/complete/v2"
+	"github.com/posener/complete/v2/install"
 	"github.com/posener/complete/v2/predict"
 )
 
@@ -27,14 +28,15 @@ func predictIdentities(prefix string) []string {
 func setupCompletion() {
 	cmd := &complete.Command{
 		Sub: map[string]*complete.Command{
-			"list":     {},
-			"current":  {},
-			"switch":   {Args: complete.PredictFunc(predictIdentities)},
-			"use":      {Args: complete.PredictFunc(predictIdentities)},
-			"add":      {},
-			"delete":   {Args: complete.PredictFunc(predictIdentities)},
-			"nickname": {Args: complete.PredictFunc(predictIdentities)},
-			"help":     {},
+			"list":       {},
+			"current":    {},
+			"switch":     {Args: complete.PredictFunc(predictIdentities)},
+			"use":        {Args: complete.PredictFunc(predictIdentities)},
+			"add":        {},
+			"delete":     {Args: complete.PredictFunc(predictIdentities)},
+			"nickname":   {Args: complete.PredictFunc(predictIdentities)},
+			"completion": {Args: predict.Set{"bash", "zsh", "fish"}, Flags: map[string]complete.Predictor{"r": predict.Nothing}},
+			"help":       {},
 		},
 		Flags: map[string]complete.Predictor{
 			"h":    predict.Nothing,
@@ -80,6 +82,8 @@ func handleCLICommand(args []string) error {
 			return fmt.Errorf("usage: gitid nickname <identifier> <nickname>")
 		}
 		return setNicknameCLI(args[1], args[2])
+	case "completion":
+		return completionCLI(args[1:])
 	case "help", "--help", "-h":
 		showHelp()
 		return nil
@@ -179,6 +183,49 @@ func setNicknameCLI(identifier, nickname string) error {
 	return nil
 }
 
+func completionCLI(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: gitid completion <shell> [-r]\nSupported shells: bash, zsh, fish")
+	}
+
+	shell := args[0]
+	remove := false
+
+	// Check for -r flag
+	if len(args) > 1 && args[1] == "-r" {
+		remove = true
+	}
+
+	// Validate shell
+	validShells := map[string]bool{"bash": true, "zsh": true, "fish": true}
+	if !validShells[shell] {
+		return fmt.Errorf("unsupported shell: %s\nSupported shells: bash, zsh, fish", shell)
+	}
+
+	if remove {
+		if !install.IsInstalled("gitid") {
+			fmt.Printf("Completion not installed for %s\n", shell)
+			return nil
+		}
+		if err := install.Uninstall("gitid"); err != nil {
+			return fmt.Errorf("failed to uninstall completion: %v", err)
+		}
+		fmt.Printf("Successfully removed completion for %s\n", shell)
+	} else {
+		if install.IsInstalled("gitid") {
+			fmt.Printf("Completion already installed for %s\n", shell)
+			return nil
+		}
+		if err := install.Install("gitid"); err != nil {
+			return fmt.Errorf("failed to install completion: %v", err)
+		}
+		fmt.Printf("Successfully installed completion for %s\n", shell)
+		fmt.Println("Please restart your shell or run: source ~/.bashrc (or ~/.zshrc)")
+	}
+
+	return nil
+}
+
 func showHelp() {
 	fmt.Println(`GitID - Git Identity Manager
 
@@ -191,6 +238,8 @@ USAGE:
     gitid add <name> <email> [nick] Add new identity with optional nickname
     gitid delete <identifier>       Delete identity
     gitid nickname <id> <nickname>  Set/update nickname for identity
+    gitid completion <shell>        Install shell completion (bash/zsh/fish)
+    gitid completion <shell> -r     Remove shell completion
     gitid help                      Show this help
 
 EXAMPLES:
@@ -199,5 +248,7 @@ EXAMPLES:
     gitid switch work
     gitid add "John Doe" "john@company.com" work
     gitid nickname john@company.com work
-    gitid delete work`)
+    gitid delete work
+    gitid completion bash
+    gitid completion zsh -r`)
 }
