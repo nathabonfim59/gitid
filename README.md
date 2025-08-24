@@ -33,6 +33,15 @@ sudo dpkg -i gitid_*.deb
 sudo rpm -i gitid_*.rpm
 ```
 
+#### Arch Linux (AUR):
+```bash
+# Pre-compiled binary
+yay -S gitid-bin
+
+# Build from source
+yay -S gitid-git
+```
+
 ### Building from Source
 
 #### Prerequisites
