@@ -142,6 +142,20 @@ func switchIdentityByIdentifier(identifier string) error {
 	return nil
 }
 
+func updateIdentity(oldEmail, newName, newEmail, newNickname string) error {
+	if oldEmail != newEmail {
+		if err := deleteIdentity(oldEmail); err != nil {
+			return fmt.Errorf("error removing old identity: %w", err)
+		}
+	}
+
+	if err := addIdentity(newName, newEmail, newNickname); err != nil {
+		return fmt.Errorf("error adding updated identity: %w", err)
+	}
+
+	return nil
+}
+
 func deleteIdentity(email string) error {
 	section := encodeEmail(email)
 
