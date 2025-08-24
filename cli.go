@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/posener/complete/v2"
@@ -224,6 +226,25 @@ func completionCLI(args []string) error {
 	}
 
 	return nil
+}
+
+func detectCurrentShell() string {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		return ""
+	}
+
+	shellName := filepath.Base(shell)
+	switch shellName {
+	case "bash":
+		return "bash"
+	case "zsh":
+		return "zsh"
+	case "fish":
+		return "fish"
+	default:
+		return ""
+	}
 }
 
 func showHelp() {

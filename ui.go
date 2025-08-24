@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/posener/complete/v2/install"
 )
 
 var (
@@ -18,6 +19,14 @@ var (
 )
 
 func runTUI() {
+	// Check if user has no identities and completion not installed
+	identities := getAllIdentities()
+	if len(identities) == 0 && shouldPromptForCompletion() {
+		if runCompletionPrompt() {
+			// After completion prompt, continue to main TUI
+		}
+	}
+
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)
@@ -182,6 +191,122 @@ func (m Model) View() string {
 	return style.Render(
 		title + "\n\n" +
 			strings.Join(items, "\n") +
+			help,
+	)
+}
+
+func shouldPromptForCompletion() bool {
+	// Check if completion is already installed
+	if install.IsInstalled("gitid") {
+		return false
+	}
+
+	// Check if we can detect the shell
+	shell := detectCurrentShell()
+	return shell != ""
+}
+
+func runCompletionPrompt() bool {
+	shell := detectCurrentShell()
+	if shell == "" {
+		return false
+	}
+
+	model := CompletionPromptModel{
+		shell:   shell,
+		choices: []string{"Yes", "No"},
+		cursor:  0,
+	}
+
+	p := tea.NewProgram(model)
+	result, err := p.Run()
+	if err != nil {
+		fmt.Printf("Error running completion prompt: %v\n", err)
+		return false
+	}
+
+	finalModel := result.(CompletionPromptModel)
+	return finalModel.shouldInstall
+}
+
+func (m CompletionPromptModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m CompletionPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q", "esc":
+			m.finished = true
+			return m, tea.Quit
+		case "left", "h":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "right", "l":
+			if m.cursor < len(m.choices)-1 {
+				m.cursor++
+			}
+		case "enter":
+			m.shouldInstall = (m.cursor == 0)
+			m.finished = true
+
+			if m.shouldInstall {
+				if err := install.Install("gitid"); err != nil {
+					fmt.Printf("Failed to install completion: %v\n", err)
+				}
+			}
+
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m CompletionPromptModel) View() string {
+	if m.finished {
+		if m.shouldInstall {
+			return lipgloss.NewStyle().
+				Foreground(successColor).
+				Render("Shell completion installed for " + m.shell + "!\n")
+		}
+		return ""
+	}
+
+	style := lipgloss.NewStyle().Margin(0, 1)
+
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(highlightColor).
+		Render("Shell Completion Setup")
+
+	message := fmt.Sprintf("Would you like to install shell completion for %s?", m.shell)
+
+	var choices []string
+	for i, choice := range m.choices {
+		if i == m.cursor {
+			choice = lipgloss.NewStyle().
+				Background(highlightColor).
+				Foreground(lipgloss.Color("0")).
+				Bold(true).
+				Render(" " + choice + " ")
+		} else {
+			choice = lipgloss.NewStyle().
+				Foreground(subtleColor).
+				Render(" " + choice + " ")
+		}
+		choices = append(choices, choice)
+	}
+
+	help := lipgloss.NewStyle().
+		Foreground(subtleColor).
+		Render("\n←/→ navigate • enter confirm • q quit")
+
+	return style.Render(
+		title + "\n\n" +
+			message + "\n\n" +
+			strings.Join(choices, " ") +
 			help,
 	)
 }
