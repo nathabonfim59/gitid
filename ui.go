@@ -17,6 +17,14 @@ var (
 	successColor   = lipgloss.Color("2")
 )
 
+func runTUI() {
+	p := tea.NewProgram(initialModel())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error: %v", err)
+		os.Exit(1)
+	}
+}
+
 func initialModel() Model {
 	identities := getAllIdentities()
 	return Model{
