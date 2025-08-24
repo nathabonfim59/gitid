@@ -75,6 +75,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.identities) {
 				m.showConfirmation = true
 			}
+		case "E", "e":
+			if m.cursor < len(m.identities) {
+				editNicknameTUI(m.identities[m.cursor])
+				m.identities = getAllIdentities()
+			}
 		case "left", "h":
 			if m.showConfirmation && m.confirmCursor > 0 {
 				m.confirmCursor--
@@ -155,7 +160,7 @@ func (m Model) View() string {
 
 	helpStyle := lipgloss.NewStyle().Foreground(subtleColor)
 	help := helpStyle.Render("\n" +
-		"↑/k up • ↓/j down • enter select • D delete • q quit\n" +
+		"↑/k up • ↓/j down • enter select • D delete • E edit nickname • q quit\n" +
 		"Confirmation: ←/→ navigate • enter confirm • esc cancel",
 	)
 
@@ -173,6 +178,20 @@ func addIdentityTUI() {
 
 	if err := addIdentity(name, email, nickname); err != nil {
 		fmt.Printf("Error adding identity: %v\n", err)
+	}
+}
+
+func editNicknameTUI(identity Identity) {
+	currentNickname := getNickname(identity.Email)
+	if currentNickname == "" {
+		currentNickname = "(none)"
+	}
+
+	fmt.Printf("Current nickname for %s: %s\n", identity.Name, currentNickname)
+	newNickname := prompt("Enter new nickname (leave empty to remove)")
+
+	if err := setNickname(identity.Email, newNickname); err != nil {
+		fmt.Printf("Error setting nickname: %v\n", err)
 	}
 }
 

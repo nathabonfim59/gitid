@@ -7,10 +7,12 @@ A terminal-based tool that helps developers manage multiple Git identities easil
 ## Features
 
 - 🔄 Switch between multiple Git identities with ease
+- 🏷️ Optional nicknames for quick identity identification
 - ➕ Add new identities interactively
 - 🗑️ Delete unwanted identities
 - 💻 Terminal-based UI with keyboard navigation
 - 🔒 Uses Git's built-in configuration system
+- 🔍 Smart identity matching by nickname, name, or email
 
 ## Installation
 
@@ -64,6 +66,7 @@ Run `gitid` to start the interactive interface.
 - `↑`/`↓` or `j`/`k` - Navigate through identities
 - `Enter` - Select identity or confirm action
 - `D` - Delete selected identity
+- `E` - Edit nickname for selected identity
 - `←`/`→` - Navigate confirmation dialog
 - `Esc` - Cancel current action
 - `q` - Quit application
@@ -72,7 +75,19 @@ Run `gitid` to start the interactive interface.
 
 - **Switch Identity**: Select an identity from the list and press Enter
 - **Add Identity**: Select "Add new identity" and follow the prompts
+  - Name and email are required
+  - Nickname is optional but helps with quick identification
+- **Edit Nickname**: Select "Edit nickname" for existing identities
 - **Delete Identity**: Navigate to an identity and press D, then confirm
+
+### Nicknames
+
+Nicknames are optional short identifiers that make it easier to distinguish between identities:
+
+- **Display**: Identities with nicknames show as `nickname (Name <email>)`
+- **Without nicknames**: Shows as `Name <email>` (backwards compatible)
+- **Adding nicknames**: Available when creating new identities or editing existing ones
+- **Smart matching**: Future CLI will support switching by nickname, name, or email
 
 ## Contributing
 
