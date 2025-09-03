@@ -198,6 +198,14 @@ gitid completion zsh     # For Zsh
 gitid completion fish    # For Fish
 ```
 
+#### Upgrade
+
+```bash
+# Upgrade completions (remove and reinstall)
+gitid completion upgrade         # Auto-detect current shell
+gitid completion upgrade bash    # Upgrade for specific shell
+```
+
 #### Removal
 
 ```bash

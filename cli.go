@@ -44,8 +44,14 @@ func setupCompletion() {
 					"add":     {},
 				},
 			},
-			"completion": {Args: predict.Set{"bash", "zsh", "fish"}, Flags: map[string]complete.Predictor{"r": predict.Nothing}},
-			"help":       {},
+			"completion": {
+				Sub: map[string]*complete.Command{
+					"upgrade": {},
+				},
+				Args:  predict.Set{"bash", "zsh", "fish"},
+				Flags: map[string]complete.Predictor{"r": predict.Nothing},
+			},
+			"help": {},
 		},
 		Flags: map[string]complete.Predictor{
 			"h":    predict.Nothing,
@@ -234,7 +240,12 @@ func setNicknameCLI(identifier, nickname string) error {
 
 func completionCLI(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: gitid completion <shell> [-r]\nSupported shells: bash, zsh, fish")
+		return fmt.Errorf("usage: gitid completion <shell> [-r] | gitid completion upgrade [shell]\nSupported shells: bash, zsh, fish")
+	}
+
+	// Handle upgrade subcommand
+	if args[0] == "upgrade" {
+		return upgradeCompletionCLI(args[1:])
 	}
 
 	shell := args[0]
@@ -271,6 +282,54 @@ func completionCLI(args []string) error {
 		fmt.Printf("Successfully installed completion for %s\n", shell)
 		fmt.Println("Please restart your shell or run: source ~/.bashrc (or ~/.zshrc)")
 	}
+
+	return nil
+}
+
+func upgradeCompletionCLI(args []string) error {
+	var shell string
+
+	// If shell is provided as argument, use it; otherwise detect current shell
+	if len(args) > 0 {
+		shell = args[0]
+	} else {
+		shell = detectCurrentShell()
+		if shell == "" {
+			return fmt.Errorf("could not detect current shell. Please specify shell: gitid completion upgrade <shell>\nSupported shells: bash, zsh, fish")
+		}
+	}
+
+	// Validate shell
+	validShells := map[string]bool{"bash": true, "zsh": true, "fish": true}
+	if !validShells[shell] {
+		return fmt.Errorf("unsupported shell: %s\nSupported shells: bash, zsh, fish", shell)
+	}
+
+	// Check if completion is currently installed
+	if !install.IsInstalled("gitid") {
+		fmt.Printf("Completion not currently installed for %s. Installing...\n", shell)
+		if err := install.Install("gitid"); err != nil {
+			return fmt.Errorf("failed to install completion: %v", err)
+		}
+		fmt.Printf("Successfully installed completion for %s\n", shell)
+		fmt.Println("Please restart your shell or run: source ~/.bashrc (or ~/.zshrc)")
+		return nil
+	}
+
+	// Remove existing completion
+	fmt.Printf("Removing existing completion for %s...\n", shell)
+	if err := install.Uninstall("gitid"); err != nil {
+		return fmt.Errorf("failed to remove existing completion: %v", err)
+	}
+
+	// Reinstall completion
+	fmt.Printf("Reinstalling completion for %s...\n", shell)
+	if err := install.Install("gitid"); err != nil {
+		return fmt.Errorf("failed to reinstall completion: %v", err)
+	}
+
+	fmt.Printf("Successfully upgraded completion for %s\n", shell)
+	fmt.Println("Please restart your shell or run: source ~/.bashrc (or ~/.zshrc)")
 
 	return nil
 }
@@ -380,6 +439,7 @@ USAGE:
     gitid repo add <name> <email> [nick] Add and set new local repository identity
     gitid completion <shell>        Install shell completion (bash/zsh/fish)
     gitid completion <shell> -r     Remove shell completion
+    gitid completion upgrade [shell] Upgrade shell completion (remove and reinstall)
     gitid help                      Show this help
 
 EXAMPLES:
@@ -393,5 +453,7 @@ EXAMPLES:
     gitid repo use work
     gitid repo add "Jane Smith" "jane@company.com" work-jane
     gitid completion bash
-    gitid completion zsh -r`)
+    gitid completion zsh -r
+    gitid completion upgrade
+    gitid completion upgrade fish`)
 }
