@@ -212,11 +212,11 @@ func addLocalIdentity(name, email, nickname string) error {
 }
 
 func getCurrentLocalIdentity() (string, string, error) {
-	nameOut, err := exec.Command("git", "config", "user.name").Output()
+	nameOut, err := exec.Command("git", "config", "--local", "user.name").Output()
 	if err != nil {
 		return "", "", fmt.Errorf("no local git identity configured")
 	}
-	emailOut, err := exec.Command("git", "config", "user.email").Output()
+	emailOut, err := exec.Command("git", "config", "--local", "user.email").Output()
 	if err != nil {
 		return "", "", fmt.Errorf("no local git identity configured")
 	}
@@ -224,4 +224,31 @@ func getCurrentLocalIdentity() (string, string, error) {
 	name := strings.TrimSpace(string(nameOut))
 	email := strings.TrimSpace(string(emailOut))
 	return name, email, nil
+}
+
+func isInGitRepository() bool {
+	err := exec.Command("git", "rev-parse", "--is-inside-work-tree").Run()
+	return err == nil
+}
+
+func hasLocalIdentity() bool {
+	if !isInGitRepository() {
+		return false
+	}
+
+	// Check if local config actually has user.name and user.email set
+	// (not just falling back to global)
+	nameOut, err := exec.Command("git", "config", "--local", "user.name").Output()
+	if err != nil {
+		return false
+	}
+	emailOut, err := exec.Command("git", "config", "--local", "user.email").Output()
+	if err != nil {
+		return false
+	}
+
+	name := strings.TrimSpace(string(nameOut))
+	email := strings.TrimSpace(string(emailOut))
+
+	return name != "" && email != ""
 }

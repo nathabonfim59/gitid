@@ -113,24 +113,43 @@ func listIdentitiesCLI() error {
 		return nil
 	}
 
-	for _, identity := range identities {
-		if identity.Nickname != "" {
-			fmt.Printf("%-12s %s <%s>\n", identity.Nickname, identity.Name, identity.Email)
-		} else {
-			fmt.Printf("%-12s %s <%s>\n", "-", identity.Name, identity.Email)
-		}
+	var localName, localEmail string
+	hasLocal := hasLocalIdentity()
+	if hasLocal {
+		localName, localEmail, _ = getCurrentLocalIdentity()
 	}
+
+	for _, identity := range identities {
+		nickname := identity.Nickname
+		if nickname == "" {
+			nickname = "-"
+		}
+
+		// Check if this identity is the current local identity
+		isLocal := hasLocal && identity.Name == localName && identity.Email == localEmail
+		localIndicator := ""
+		if isLocal {
+			localIndicator = " [current local]"
+		}
+
+		fmt.Printf("%-12s %s <%s>%s\n", nickname, identity.Name, identity.Email, localIndicator)
+	}
+
+	if isInGitRepository() && !hasLocal {
+		fmt.Printf("\n(In git repository using global identity)\n")
+	}
+
 	return nil
 }
 
 func getCurrentIdentityCLI() error {
 	nameOut, err := exec.Command("git", "config", "--global", "user.name").Output()
 	if err != nil {
-		return fmt.Errorf("no git identity configured")
+		return fmt.Errorf("no global git identity configured")
 	}
 	emailOut, err := exec.Command("git", "config", "--global", "user.email").Output()
 	if err != nil {
-		return fmt.Errorf("no git identity configured")
+		return fmt.Errorf("no global git identity configured")
 	}
 
 	name := strings.TrimSpace(string(nameOut))
@@ -138,10 +157,26 @@ func getCurrentIdentityCLI() error {
 
 	nickname := getNickname(email)
 	if nickname != "" {
-		fmt.Printf("%s (%s <%s>)\n", nickname, name, email)
+		fmt.Printf("Global: %s (%s <%s>)\n", nickname, name, email)
 	} else {
-		fmt.Printf("%s <%s>\n", name, email)
+		fmt.Printf("Global: %s <%s>\n", name, email)
 	}
+
+	// If we're in a git repository and have a local identity, show it too
+	if hasLocalIdentity() {
+		localName, localEmail, err := getCurrentLocalIdentity()
+		if err == nil {
+			localNickname := getNickname(localEmail)
+			if localNickname != "" {
+				fmt.Printf("Local:  %s (%s <%s>)\n", localNickname, localName, localEmail)
+			} else {
+				fmt.Printf("Local:  %s <%s>\n", localName, localEmail)
+			}
+		}
+	} else if isInGitRepository() {
+		fmt.Printf("Local:  (using global identity)\n")
+	}
+
 	return nil
 }
 
