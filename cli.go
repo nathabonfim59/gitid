@@ -30,13 +30,20 @@ func predictIdentities(prefix string) []string {
 func setupCompletion() {
 	cmd := &complete.Command{
 		Sub: map[string]*complete.Command{
-			"list":       {},
-			"current":    {},
-			"switch":     {Args: complete.PredictFunc(predictIdentities)},
-			"use":        {Args: complete.PredictFunc(predictIdentities)},
-			"add":        {},
-			"delete":     {Args: complete.PredictFunc(predictIdentities)},
-			"nickname":   {Args: complete.PredictFunc(predictIdentities)},
+			"list":     {},
+			"current":  {},
+			"switch":   {Args: complete.PredictFunc(predictIdentities)},
+			"use":      {Args: complete.PredictFunc(predictIdentities)},
+			"add":      {},
+			"delete":   {Args: complete.PredictFunc(predictIdentities)},
+			"nickname": {Args: complete.PredictFunc(predictIdentities)},
+			"repo": {
+				Sub: map[string]*complete.Command{
+					"current": {},
+					"use":     {Args: complete.PredictFunc(predictIdentities)},
+					"add":     {},
+				},
+			},
 			"completion": {Args: predict.Set{"bash", "zsh", "fish"}, Flags: map[string]complete.Predictor{"r": predict.Nothing}},
 			"help":       {},
 		},
@@ -86,6 +93,11 @@ func handleCLICommand(args []string) error {
 		return setNicknameCLI(args[1], args[2])
 	case "completion":
 		return completionCLI(args[1:])
+	case "repo":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: gitid repo <list|use|current> [identifier]")
+		}
+		return repoCLI(args[1:])
 	case "help", "--help", "-h":
 		showHelp()
 		return nil
@@ -247,18 +259,90 @@ func detectCurrentShell() string {
 	}
 }
 
+func repoCLI(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: gitid repo <list|use|current|add> [args]")
+	}
+
+	subcommand := args[0]
+	switch subcommand {
+	case "current":
+		return getCurrentLocalIdentityCLI()
+	case "use":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: gitid repo use <identifier>")
+		}
+		return useLocalIdentityCLI(args[1])
+	case "add":
+		if len(args) < 3 {
+			return fmt.Errorf("usage: gitid repo add <name> <email> [nickname]")
+		}
+		nickname := ""
+		if len(args) > 3 {
+			nickname = args[3]
+		}
+		return addLocalIdentityCLI(args[1], args[2], nickname)
+	default:
+		return fmt.Errorf("unknown repo subcommand: %s", subcommand)
+	}
+}
+
+func getCurrentLocalIdentityCLI() error {
+	name, email, err := getCurrentLocalIdentity()
+	if err != nil {
+		return err
+	}
+
+	nickname := getNickname(email)
+	if nickname != "" {
+		fmt.Printf("%s (%s <%s>) [local]\n", nickname, name, email)
+	} else {
+		fmt.Printf("%s <%s> [local]\n", name, email)
+	}
+	return nil
+}
+
+func useLocalIdentityCLI(identifier string) error {
+	if err := setLocalIdentityByIdentifier(identifier); err != nil {
+		return err
+	}
+
+	identity, found := findIdentityByIdentifier(identifier)
+	if !found {
+		return fmt.Errorf("identity not found: %s", identifier)
+	}
+
+	display := getIdentityDisplay(identity)
+	fmt.Printf("Set local repository identity to %s\n", display)
+	return nil
+}
+
+func addLocalIdentityCLI(name, email, nickname string) error {
+	if err := addLocalIdentity(name, email, nickname); err != nil {
+		return err
+	}
+
+	identity := Identity{Name: name, Email: email, Nickname: nickname}
+	display := getIdentityDisplay(identity)
+	fmt.Printf("Added and set local repository identity to %s\n", display)
+	return nil
+}
+
 func showHelp() {
 	fmt.Println(`GitID - Git Identity Manager
 
 USAGE:
     gitid                           Launch interactive TUI
     gitid list                      List all identities
-    gitid current                   Show current git identity
-    gitid switch <identifier>       Switch to identity by nickname, name, or email
+    gitid current                   Show current global git identity
+    gitid switch <identifier>       Switch global identity by nickname, name, or email
     gitid use <identifier>          Alias for switch
     gitid add <name> <email> [nick] Add new identity with optional nickname
     gitid delete <identifier>       Delete identity
     gitid nickname <id> <nickname>  Set/update nickname for identity
+    gitid repo current              Show current local repository identity
+    gitid repo use <identifier>     Set local repository identity
+    gitid repo add <name> <email> [nick] Add and set new local repository identity
     gitid completion <shell>        Install shell completion (bash/zsh/fish)
     gitid completion <shell> -r     Remove shell completion
     gitid help                      Show this help
@@ -270,6 +354,9 @@ EXAMPLES:
     gitid add "John Doe" "john@company.com" work
     gitid nickname john@company.com work
     gitid delete work
+    gitid repo current
+    gitid repo use work
+    gitid repo add "Jane Smith" "jane@company.com" work-jane
     gitid completion bash
     gitid completion zsh -r`)
 }
