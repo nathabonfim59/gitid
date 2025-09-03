@@ -6,13 +6,16 @@ A terminal-based tool that helps developers manage multiple Git identities easil
 
 ## Features
 
-- 🔄 Switch between multiple Git identities with ease
+- 🔄 Switch between multiple Git identities globally
+- 📁 Set repository-specific local identities
 - 🏷️ Optional nicknames for quick identity identification
 - ➕ Add new identities interactively
 - 🗑️ Delete unwanted identities
 - 💻 Terminal-based UI with keyboard navigation
 - 🔒 Uses Git's built-in configuration system
 - 🔍 Smart identity matching by nickname, name, or email
+- 📋 Command-line interface for automation and scripting
+- ✨ Visual indicators for current global and local identities
 
 ## Installation
 
@@ -68,26 +71,119 @@ make clean
 
 ## Usage
 
-Run `gitid` to start the interactive interface.
+GitID provides both an interactive TUI and command-line interface for managing Git identities.
 
-### Keyboard Controls
+### Interactive Mode
+
+Run `gitid` (without arguments) to start the interactive interface.
+
+#### Keyboard Controls
 
 - `↑`/`↓` or `j`/`k` - Navigate through identities
-- `Enter` - Select identity or confirm action
+- `Enter` - Select identity to set as global
+- `r` - Set selected identity as local for current repository
+- `R` - Remove local identity (use global)
 - `D` - Delete selected identity
-- `E` - Edit nickname for selected identity
+- `e` - Edit nickname for selected identity
+- `E` - Edit full identity (name, email, nickname)
 - `←`/`→` - Navigate confirmation dialog
 - `Esc` - Cancel current action
 - `q` - Quit application
 
+### Command Line Interface
+
+GitID also provides a full CLI for automation and scripting:
+
+#### Global Identity Management
+```bash
+# List all identities
+gitid list
+
+# Show current global (and local if in repo) identity
+gitid current
+
+# Switch global identity
+gitid switch <nickname|name|email>
+gitid use <nickname|name|email>        # Alias for switch
+
+# Add new identity
+gitid add "Full Name" "email@domain.com" [nickname]
+
+# Delete identity
+gitid delete <nickname|name|email>
+
+# Set/update nickname
+gitid nickname <identifier> <new-nickname>
+```
+
+#### Repository-Specific (Local) Identity Management
+```bash
+# Show current local identity for repository
+gitid repo current
+
+# Set existing identity as local for current repository
+gitid repo use <nickname|name|email>
+
+# Add new identity and set as local for current repository
+gitid repo add "Full Name" "email@domain.com" [nickname]
+```
+
+### Global vs Local Identities
+
+GitID supports both **global** and **local** (repository-specific) Git identities:
+
+#### Global Identity
+- Applied to all Git repositories by default
+- Stored in Git's global configuration (`~/.gitconfig`)
+- Set with `gitid switch <identifier>` or by pressing `Enter` in TUI
+
+#### Local Identity
+- Applied only to the current repository
+- Stored in the repository's local `.git/config`
+- Overrides global identity for that specific repository
+- Set with `gitid repo use <identifier>` or by pressing `r` in TUI
+
+#### Visual Indicators
+- **TUI**: Shows repository status and `[local]` indicators
+- **CLI**: `gitid current` shows both global and local when in a repository
+- **CLI**: `gitid list` shows `[current local]` indicator
+
 ### Managing Identities
 
-- **Switch Identity**: Select an identity from the list and press Enter
+#### In TUI (Interactive Mode)
+- **Switch Global Identity**: Select an identity and press `Enter`
+- **Set Local Identity**: Select an identity and press `r` (only in git repositories)
+- **Remove Local Identity**: Press `R` to fall back to global identity
 - **Add Identity**: Select "Add new identity" and follow the prompts
-  - Name and email are required
-  - Nickname is optional but helps with quick identification
-- **Edit Nickname**: Select "Edit nickname" for existing identities
-- **Delete Identity**: Navigate to an identity and press D, then confirm
+- **Edit Identity**: Press `e` for nickname or `E` for full identity
+- **Delete Identity**: Navigate to an identity and press `D`, then confirm
+
+#### Via Command Line
+- **Global**: Use `gitid switch/use/add/delete` commands
+- **Local**: Use `gitid repo use/add/current` commands
+
+### Example Workflow
+
+```bash
+# Add work identity
+gitid add "John Doe" "john.doe@company.com" work
+
+# Add personal identity
+gitid add "John Doe" "john@personal.com" personal
+
+# Set global identity to personal
+gitid switch personal
+
+# In work repository, set local identity to work
+cd ~/work-project
+gitid repo use work
+
+# Check current status
+gitid current
+# Output:
+# Global: personal (John Doe <john@personal.com>)
+# Local:  work (John Doe <john.doe@company.com>)
+```
 
 ### Shell Completions
 
@@ -98,8 +194,16 @@ GitID supports shell completions for Bash, Zsh, and Fish to provide tab-completi
 ```bash
 # Install for your current shell (auto-detected)
 gitid completion bash    # For Bash
-gitid completion zsh     # For Zsh  
+gitid completion zsh     # For Zsh
 gitid completion fish    # For Fish
+```
+
+#### Upgrade
+
+```bash
+# Upgrade completions (remove and reinstall)
+gitid completion upgrade         # Auto-detect current shell
+gitid completion upgrade bash    # Upgrade for specific shell
 ```
 
 #### Removal
@@ -120,7 +224,19 @@ Nicknames are optional short identifiers that make it easier to distinguish betw
 - **Display**: Identities with nicknames show as `nickname (Name <email>)`
 - **Without nicknames**: Shows as `Name <email>` (backwards compatible)
 - **Adding nicknames**: Available when creating new identities or editing existing ones
-- **Smart matching**: Future CLI will support switching by nickname, name, or email
+- **Smart matching**: CLI supports switching by nickname, name, or email
+- **Quick identification**: Especially useful when you have multiple identities with similar names
+
+### Help and Documentation
+
+```bash
+# Show help and all available commands
+gitid help
+
+# Get command-specific usage
+gitid repo          # Shows repo subcommand usage
+gitid completion    # Shows completion installation usage
+```
 
 ## Contributing
 

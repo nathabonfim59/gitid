@@ -14,6 +14,10 @@ type Model struct {
 	showConfirmation bool
 	confirmChoices   []string
 	confirmCursor    int
+	isInGitRepo      bool
+	hasLocalIdentity bool
+	localName        string
+	localEmail       string
 }
 
 type InputModel struct {

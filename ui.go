@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -36,12 +37,25 @@ func runTUI() {
 
 func initialModel() Model {
 	identities := getAllIdentities()
+
+	isInRepo := isInGitRepository()
+	hasLocal := hasLocalIdentity()
+	var localName, localEmail string
+
+	if hasLocal {
+		localName, localEmail, _ = getCurrentLocalIdentity()
+	}
+
 	return Model{
 		identities:       identities,
 		cursor:           0,
 		showConfirmation: false,
 		confirmChoices:   []string{"Yes", "No"},
 		confirmCursor:    1,
+		isInGitRepo:      isInRepo,
+		hasLocalIdentity: hasLocal,
+		localName:        localName,
+		localEmail:       localEmail,
 	}
 }
 
@@ -117,6 +131,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.showConfirmation = false
 				m.confirmCursor = 1
 			}
+		case "r":
+			if m.cursor < len(m.identities) && m.isInGitRepo {
+				identity := m.identities[m.cursor]
+				if err := setLocalIdentity(identity.Name, identity.Email); err != nil {
+					fmt.Printf("Error setting local identity: %v\n", err)
+				} else {
+					// Update local identity info
+					m.hasLocalIdentity = true
+					m.localName = identity.Name
+					m.localEmail = identity.Email
+				}
+			}
+		case "R":
+			if m.hasLocalIdentity && m.isInGitRepo {
+				// Unset local identity
+				exec.Command("git", "config", "--unset", "user.name").Run()
+				exec.Command("git", "config", "--unset", "user.email").Run()
+				m.hasLocalIdentity = false
+				m.localName = ""
+				m.localEmail = ""
+			}
 		}
 	}
 	return m, nil
@@ -129,10 +164,39 @@ func (m Model) View() string {
 		Foreground(highlightColor).
 		Render("Git Identity Manager")
 
+	// Add repository status
+	var repoStatus string
+	if m.isInGitRepo {
+		if m.hasLocalIdentity {
+			localNickname := getNickname(m.localEmail)
+			if localNickname != "" {
+				repoStatus = fmt.Sprintf("Repository Identity: %s (%s <%s>)", localNickname, m.localName, m.localEmail)
+			} else {
+				repoStatus = fmt.Sprintf("Repository Identity: %s <%s>", m.localName, m.localEmail)
+			}
+			repoStatus = lipgloss.NewStyle().
+				Foreground(successColor).
+				Render(repoStatus)
+		} else {
+			repoStatus = lipgloss.NewStyle().
+				Foreground(subtleColor).
+				Render("Repository: Using global identity")
+		}
+	}
+
 	var items []string
 	for i, identity := range m.identities {
 		cursor := "  "
 		displayText := getIdentityDisplay(identity)
+
+		// Check if this is the current local identity
+		isCurrentLocal := m.hasLocalIdentity && identity.Name == m.localName && identity.Email == m.localEmail
+		if isCurrentLocal {
+			displayText += lipgloss.NewStyle().
+				Foreground(successColor).
+				Render(" [local]")
+		}
+
 		if m.cursor == i {
 			cursor = "▸ "
 			displayText = lipgloss.NewStyle().
@@ -183,16 +247,23 @@ func (m Model) View() string {
 	}
 
 	helpStyle := lipgloss.NewStyle().Foreground(subtleColor)
-	help := helpStyle.Render("\n" +
-		"↑/k up • ↓/j down • enter select • D delete • e edit nickname • E edit full • q quit\n" +
-		"Confirmation: ←/→ navigate • enter confirm • esc cancel",
-	)
+	var helpText string
+	if m.isInGitRepo {
+		helpText = "↑/k up • ↓/j down • enter select/set global • r set local • R unset local\n" +
+			"D delete • e edit nickname • E edit full • q quit"
+	} else {
+		helpText = "↑/k up • ↓/j down • enter select/set global • D delete • e edit nickname • E edit full • q quit"
+	}
+	helpText += "\nConfirmation: ←/→ navigate • enter confirm • esc cancel"
+	help := helpStyle.Render("\n" + helpText)
 
-	return style.Render(
-		title + "\n\n" +
-			strings.Join(items, "\n") +
-			help,
-	)
+	result := title
+	if repoStatus != "" {
+		result += "\n" + repoStatus
+	}
+	result += "\n\n" + strings.Join(items, "\n") + help
+
+	return style.Render(result)
 }
 
 func shouldPromptForCompletion() bool {
