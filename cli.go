@@ -95,7 +95,7 @@ func handleCLICommand(args []string) error {
 		return completionCLI(args[1:])
 	case "repo":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: gitid repo <list|use|current> [identifier]")
+			return fmt.Errorf("usage: gitid repo <current|use|add> [identifier]")
 		}
 		return repoCLI(args[1:])
 	case "help", "--help", "-h":
@@ -296,7 +296,7 @@ func detectCurrentShell() string {
 
 func repoCLI(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: gitid repo <list|use|current|add> [args]")
+		return fmt.Errorf("usage: gitid repo <current|use|add> [args]")
 	}
 
 	subcommand := args[0]
