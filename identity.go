@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+var nicknameCache = make(map[string]string)
+
 func encodeEmail(email string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(email, "@", "_at_"), ".", "_dot_")
 }
@@ -14,17 +16,30 @@ func encodeEmail(email string) string {
 func setNickname(email, nickname string) error {
 	section := encodeEmail(email)
 	nicknameCmd := fmt.Sprintf("identity.%s.nickname", section)
-	return exec.Command("git", "config", "--global", nicknameCmd, nickname).Run()
+	err := exec.Command("git", "config", "--global", nicknameCmd, nickname).Run()
+	if err == nil {
+		// Update cache
+		nicknameCache[email] = nickname
+	}
+	return err
 }
 
 func getNickname(email string) string {
+	// Check cache first
+	if cached, exists := nicknameCache[email]; exists {
+		return cached
+	}
+
 	section := encodeEmail(email)
 	nicknameCmd := fmt.Sprintf("identity.%s.nickname", section)
 	out, err := exec.Command("git", "config", "--global", nicknameCmd).Output()
 	if err != nil {
+		nicknameCache[email] = ""
 		return ""
 	}
-	return strings.TrimSpace(string(out))
+	nickname := strings.TrimSpace(string(out))
+	nicknameCache[email] = nickname
+	return nickname
 }
 
 func hasNickname(email string) bool {
@@ -171,6 +186,9 @@ func deleteIdentity(email string) error {
 	}
 	exec.Command("git", "config", "--global", "--unset", nicknameCmd).Run()
 
+	// Clear from cache
+	delete(nicknameCache, email)
+
 	return nil
 }
 
@@ -229,6 +247,16 @@ func getCurrentLocalIdentity() (string, string, error) {
 func isInGitRepository() bool {
 	err := exec.Command("git", "rev-parse", "--is-inside-work-tree").Run()
 	return err == nil
+}
+
+func unsetLocalIdentity() error {
+	if !isInGitRepository() {
+		return fmt.Errorf("not in a git repository")
+	}
+	if err := exec.Command("git", "config", "--local", "--unset", "user.name").Run(); err != nil {
+		return err
+	}
+	return exec.Command("git", "config", "--local", "--unset", "user.email").Run()
 }
 
 func hasLocalIdentity() bool {

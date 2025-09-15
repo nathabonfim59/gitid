@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -149,8 +148,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "R":
 			if m.hasLocalIdentity && m.isInGitRepo {
 				// Unset local identity
-				exec.Command("git", "config", "--unset", "user.name").Run()
-				exec.Command("git", "config", "--unset", "user.email").Run()
+				if err := unsetLocalIdentity(); err != nil {
+					fmt.Printf("Error unsetting local identity: %v\n", err)
+					break
+				}
 				m.hasLocalIdentity = false
 				m.localName = ""
 				m.localEmail = ""
