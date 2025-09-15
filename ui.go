@@ -39,11 +39,14 @@ func initialModel() Model {
 	identities := getAllIdentities()
 
 	isInRepo := isInGitRepository()
-	hasLocal := hasLocalIdentity()
 	var localName, localEmail string
+	var hasLocal bool
 
-	if hasLocal {
-		localName, localEmail, _ = getCurrentLocalIdentity()
+	if isInRepo {
+		hasLocal = hasLocalIdentity()
+		if hasLocal {
+			localName, localEmail, _ = getCurrentLocalIdentity()
+		}
 	}
 
 	return Model{
