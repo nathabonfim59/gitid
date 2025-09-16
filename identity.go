@@ -193,10 +193,15 @@ func deleteIdentity(email string) error {
 }
 
 func setLocalIdentity(name, email string) error {
-	if err := exec.Command("git", "config", "user.name", name).Run(); err != nil {
+	// Check if we're inside a git repository
+	if err := exec.Command("git", "rev-parse", "--is-inside-work-tree").Run(); err != nil {
+		return fmt.Errorf("not inside a git repository: cannot set local identity")
+	}
+
+	if err := exec.Command("git", "config", "--local", "user.name", name).Run(); err != nil {
 		return fmt.Errorf("error setting local user name: %w", err)
 	}
-	if err := exec.Command("git", "config", "user.email", email).Run(); err != nil {
+	if err := exec.Command("git", "config", "--local", "user.email", email).Run(); err != nil {
 		return fmt.Errorf("error setting local user email: %w", err)
 	}
 	return nil
